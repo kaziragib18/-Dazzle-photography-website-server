@@ -5,12 +5,14 @@ require('dotenv').config();
 const { MongoClient } = require('mongodb');
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
 const ObjectId = require('mongodb').ObjectId;
+const fileUpload = require('express-fileupload')
 
-const app = express()
+const app = express();
 const port = process.env.PORT || 5000;
+app.use(fileUpload());
 
-
-const serviceAccount = require("./dazzle-photography-website-firebase-adminsdk-dmvhv-a08f9c01bb.json");
+//replaced \\n with \n in service key after stringify the key
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
@@ -50,6 +52,7 @@ async function run() {
     const packagesCollection = database.collection('packages');
     const bookingsCollection = database.collection('bookings');
     const usersCollection = database.collection('users');
+    const reviewsCollection = database.collection('reviews');
 
     //get package api
     app.get('/packages', async (req, res) => {
@@ -135,6 +138,39 @@ async function run() {
       res.json(result);
     })
 
+    //post review api
+    app.post('/reviews', async (req, res) => {
+      const name = req.body.name;
+      const email = req.body.email;
+      const rating = req.body.rating;
+      const desc = req.body.desc;
+      const pic = req.files.image;
+      const picData = pic.data;
+      const encodedPic = picData.toString('base64');
+      const imageBuffer = Buffer.from(encodedPic, 'base64');
+      const review = {
+        img: imageBuffer,
+        name,
+        email,
+        rating,
+        desc,
+      }
+      // console.log('body', req.body);
+      // console.log('files', req.files);
+      // res.json({ success: true });
+      // const review = req.body;
+      // console.log('hit the post api', review);
+      const result = await reviewsCollection.insertOne(review);
+      // console.log(result);
+      res.json(result);
+    });
+
+    //get review api
+    app.get('/reviews', async (req, res) => {
+      const cursor = reviewsCollection.find({});
+      const reviews = await cursor.toArray();
+      res.json(reviews);
+    })
 
     //post user api 
     app.post('/users', async (req, res) => {
